@@ -1,0 +1,4 @@
+# Bỏ qua thư mục node_modules (trong dự án Node.js)
+node_modules/
+# Bỏ qua tệp cấu hình cá nhân
+.env

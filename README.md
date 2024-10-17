@@ -1,1 +1,4 @@
-# SM-server
+I/ INTALLS
+- npm i
+II/ DELOY
+

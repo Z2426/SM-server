@@ -1,0 +1,22 @@
+import express from "express";
+import dotenv from "dotenv";
+import cors from "cors";
+import morgan from "morgan";
+import bodyParser from "body-parser";
+import dbConnection from "./dbConfig/index.js";
+import router from './routes/index.js';
+import helmet from "helmet";
+dotenv.config();
+const app = express();
+const PORT = process.env.PORT || 8800;
+app.use(helmet());
+app.use(cors());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(morgan("dev"));
+// app.use(errorMiddleware);
+app.use(router);
+dbConnection();
+app.listen(PORT, () => {
+    console.log(`Server is running at http://localhost:${PORT}`);
+});
