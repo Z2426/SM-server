@@ -1,5 +1,7 @@
 import Comments from "../models/commentModel.js";
 import Posts from "../models/postModel.js";
+import Users from "../models/userModel.js";
+
 //handle comment
 // get all comment of post
 export const getComments= async(req,res)=>{
@@ -50,9 +52,6 @@ export const replyPostComment = async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 };
-export const likePostComment = async(req,res)=>{
-
-}
 // PUT : edit content comment
 export const editComment =async (req,res)=>{
   try {

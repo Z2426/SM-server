@@ -8,22 +8,32 @@ import {
   friendRequest,
   respondToFriendRequest,
   getFriendRequest,
-  profileViews,
   getUser,
-  updateUser,unFriend ,
+  updateUser,unFriend , toggleFollow,
+  handleBlock,
+  getProfile,
+  unfriendUser
 } from "../controller/userController.js";
 const router = express.Router();
+//router
 // ----MANAGE FRIEND
 //unfriend
-router.post("/unfriend",userAuth,unFriend)
+router.delete('/unfriend/:friendId', userAuth,unfriendUser)
+//show profile
+router.get("/profile/:friendId?",userAuth,getProfile)
+// block / unblock
+router.post("/block/:userId",userAuth,handleBlock)
+// toggle follow
+router.post('/follow/:userId',userAuth, toggleFollow)
+//unfriend
+router.post("/unfriend/:friendId",userAuth,unFriend)
 //accept /deny friend request
 router.post("/friend-requests/respond", userAuth, respondToFriendRequest)
 // friend request
 router.post("/friend-request", userAuth, friendRequest)
 router.get("/get-friend-request", userAuth, getFriendRequest)
 // -----USER-------
-//view profile
-router.get("/profile-view", userAuth, profileViews)
+
 // user routes
 router.get("/get-user/:userId?", userAuth, getUser)
 router.put("/update-user", userAuth, updateUser)

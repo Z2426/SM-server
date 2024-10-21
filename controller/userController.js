@@ -5,92 +5,249 @@ import Verification from "../models/emailVerificationModel.js";
 import { compareString, hashString } from "../untils/index.js";
 import passwordReset from "../models/passwordResetModel.js";
 import { resetPasswordLink } from "../untils/sendEmail.js";
-export const unFriend = async (req, res) => {
-  const { userId } = req.body.user;
-  console.log(req.body)
-  const { friendId } = req.body; 
+import Posts from "../models/postModel.js";
+//import { followNotification } from "./notifiController.js";
+// unfriend
+export const unfriendUser = async (req, res, next) => {
   try {
-      const user = await Users.findById(userId);
-      const friend = await Users.findById(friendId);
-      if (!user || !friend) {
-          return res.status(404).json({
-              success: false,
-              message: "User or friend not found",
-          });
-      }
-      user.friends = user.friends.filter(id => id.toString() !== friendId);
-      await user.save();
-      friend.friends = friend.friends.filter(id => id.toString() !== userId);
-      await friend.save();
-      return res.status(200).json({
-          success: true,
-          message: "Friend removed successfully",
-      });
-  } catch (error) {
-      console.error(error);
-      return res.status(500).json({
-          success: false,
-          message: "Internal server error.",
-          error: error.message,
-      });
-  }
-};
+    const requesterId = req.body.user.userId; // ID của người hủy kết bạn
+    const friendId  = req.params.friendId; // ID của người bạn cần hủy kết bạn
 
-export const profileViews = async (req, res, next) => {
-  try {
-    const { userId } = req.body.user;
-    const { id } = req.body;
+    // Tìm người dùng và người bạn
+    const [user, friend] = await Promise.all([
+      Users.findById(requesterId),
+      Users.findById(friendId),
+    ]);
 
-    // Kiểm tra xem người dùng có tồn tại không
-    const user = await Users.findById(id);
-    if (!user) {
+    // Kiểm tra nếu người dùng hoặc người bạn không tồn tại
+    if (!user || !friend) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: "Người dùng hoặc người bạn không tồn tại.",
       });
     }
 
-    // Kiểm tra xem userId đã có trong mảng views chưa
-    if (!user.views.includes(userId)) {
-      user.views.push(userId);
-      await user.save();
-    }
+    // Xóa người bạn khỏi danh sách bạn bè của người dùng
+    user.friends = user.friends.filter(id => id.toString() !== friendId);
+
+    // Xóa người dùng khỏi danh sách bạn bè của người bạn
+    friend.friends = friend.friends.filter(id => id.toString() !== requesterId);
+
+    // Lưu thay đổi
+    await Promise.all([user.save(), friend.save()]);
 
     res.status(200).json({
       success: true,
-      message: "Profile views updated successfully",
+      message: "Đã hủy kết bạn thành công.",
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({
+      message: "Có lỗi xảy ra trong quá trình hủy kết bạn.",
+      success: false,
+      error: error.message,
+    });
   }
 };
+
+//xem profile user / guest
+export const getProfile = async(req,res,next)=>{
+  const friendId = req.params.friendId || req.body.user.userId; // Nếu không có friendId, sử dụng userId của người dùng hiện tại
+    try {
+        // Lấy thông tin bạn bè
+        const friend = await Users.findById(friendId).select('firstName lastName email avatar profession location verified');
+        if (!friend) {
+            return res.status(404).json({ message: "Người dùng không tồn tại." });
+        }
+        // Lấy danh sách bài đăng của bạn bè cùng với bình luận và lượt thích
+        const posts = await Posts.find({ userId: friendId })
+            .populate('likes', 'firstName lastName avatar') // Lấy thông tin người thích bài đăng
+            .populate({ 
+                path: 'comments', 
+                populate: { path: 'userId', select: 'firstName lastName avatar' } // Lấy thông tin bình luận và người bình luận
+            })
+            .sort({ createdAt: -1 }); // Sắp xếp theo thời gian tạo
+
+        // Trả về thông tin người dùng và bài đăng
+        res.status(200).json({ friend, posts });
+    } catch (error) {
+        console.error('Lỗi khi lấy thông tin profile:', error);
+        res.status(500).json({ message: 'Lỗi server khi lấy thông tin profile.' });
+    }
+
+}
+// block / unblock
+export const  handleBlock =async(req,res,next)=>{
+  const targetUserId = req.params.userId; // ID của người dùng cần chặn/bỏ chặn
+    const requesterId = req.body.user.userId; // ID của người dùng đang thực hiện yêu cầu
+  try {
+    // Tìm người dùng yêu cầu
+    const requester = await Users.findById(requesterId);
+    const targetUser = await Users.findById(targetUserId);
+
+    if (!targetUser) {
+        return res.status(404).json({ message: "Người dùng không tồn tại." });
+    }
+
+    // Khởi tạo mảng blocked nếu chưa tồn tại
+    if (!requester.blocked) {
+        requester.blocked = []; // Khởi tạo mảng trống
+    }
+    // Kiểm tra xem người dùng đã bị chặn chưa
+    const isBlocked = requester.blocked.includes(targetUserId);
+
+    if (isBlocked) {
+        // Nếu đã bị chặn, bỏ chặn
+        requester.blocked.pull(targetUserId);
+        await requester.save();
+        return res.status(200).json({ message: "Đã bỏ chặn người dùng." });
+    } else {
+        // Nếu chưa bị chặn, chặn người dùng
+        requester.blocked.push(targetUserId);
+        await requester.save();
+        return res.status(200).json({ message: "Đã chặn người dùng." });
+    }
+} catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Đã xảy ra lỗi trong quá trình chặn/bỏ chặn người dùng." });
+}
+}
+//unfriend
+export const unFriend =async(req,res,next)=>{
+  try {
+    const currentUserId = req.body.user.userId; // ID người thực hiện thao tác unfriend
+    const friendId = req.params.friendId; // ID người bạn muốn hủy kết bạn
+    // Tìm người dùng hiện tại
+    const currentUser = await Users.findById(currentUserId);
+    if (!currentUser) {
+        return res.status(404).json({ message: 'Người dùng không tồn tại.' });
+    }
+    // Tìm người bạn muốn hủy kết bạn
+    const friendToUnfriend = await Users.findById(friendId);
+    if (!friendToUnfriend) {
+        return res.status(404).json({ message: 'Người bạn này không tồn tại.' });
+    }
+    // Kiểm tra xem người đó có trong danh sách bạn bè không
+    if (!currentUser.friends.includes(friendId)) {
+        return res.status(400).json({ message: 'Người này không phải bạn của bạn.' });
+    }
+    // Xóa bạn bè trong danh sách bạn bè của người dùng hiện tại
+    currentUser.friends = currentUser.friends.filter(friend => friend.toString() !== friendId);
+    // Xóa người dùng hiện tại khỏi danh sách bạn bè của người kia
+    friendToUnfriend.friends = friendToUnfriend.friends.filter(friend => friend.toString() !== currentUserId);
+    // Lưu thay đổi
+    await currentUser.save();
+    await friendToUnfriend.save();
+    return res.status(200).json({ message: 'Đã hủy kết bạn thành công.' });
+} catch (error) {
+    console.error('Lỗi khi hủy kết bạn:', error);
+    return res.status(500).json({ message: 'Có lỗi xảy ra, vui lòng thử lại sau.' });
+}
+}
+//follow or unfollow
+export const toggleFollow = async (req,res,next)=>{
+  
+  console.log("togleFollow")
+  const userId = req.params.userId; // ID người dùng cần theo dõi/bỏ theo dõi
+  const followerId = req.body.user.userId ; // ID của người dùng đang theo dõi
+ // Kiểm tra và in ra các giá trị quan trọng
+ console.log('req.params:', req.params); // In ra toàn bộ params
+ console.log('userId:', userId); // Kiểm tra giá trị của userId
+ console.log('followerId:', followerId); // Kiểm tra giá trị của followerId
+  // Kiểm tra xem người dùng có đang cố gắng theo dõi chính mình không
+  if (userId === followerId) {
+      return res.status(400).json({ message: 'You cannot follow yourself' });
+  }
+  
+  try {
+      // Tìm người dùng theo userId và followerId trong cơ sở dữ liệu
+      const user = await Users.findById(userId);
+      const follower = await Users.findById(followerId);
+      console.log(user)
+      console.log(follower)
+       
+      // Kiểm tra xem cả hai người dùng có tồn tại hay không
+      if (!user || !follower) {
+          return res.status(404).json({ message: 'User not found' });
+      }
+      if (!Array.isArray(user.followers)|| !Array.isArray(follower.followers)) {
+        user.followers = [];
+        user.followers = [];
+    }
+
+      // Kiểm tra xem followerId có nằm trong danh sách followers của user không
+      const isFollowing = user.followers.includes(followerId);
+
+      if (isFollowing) {
+          // Nếu đã theo dõi, thực hiện bỏ theo dõi
+          user.followers = user.followers.filter(id => id.toString() !== followerId); // Bỏ followerId khỏi danh sách followers
+          follower.following = follower.following.filter(id => id.toString() !== userId); // Bỏ userId khỏi danh sách following
+          await user.save(); // Lưu thay đổi cho người dùng
+          await follower.save(); // Lưu thay đổi cho người theo dõi
+          return res.status(200).json({ message: 'Unfollowed successfully' }); // Trả về thông báo
+      } else {
+          // Nếu chưa theo dõi, thực hiện theo dõi
+          user.followers.push(followerId); // Thêm followerId vào danh sách followers
+          follower.following.push(userId); // Thêm userId vào danh sách following
+          await user.save(); // Lưu thay đổi cho người dùng
+          await follower.save(); // Lưu thay đổi cho người theo dõi
+          return res.status(200).json({ message: 'Now following' }); // Trả về thông báo
+      }
+  } catch (error) {
+      res.status(500).json({ message: error.message }); // Xử lý lỗi nếu có
+  }
+}
+
+
 export const respondToFriendRequest = async (req, res, next) => {
   try {
     const requesterId = req.body.user.userId; 
     const { requestId, requestStatus } = req.body; 
     const friendRequest = await FriendsRequest.findById(requestId);
+    
     if (!friendRequest) {
       return next("No Friend Request Found."); 
     }
-    await FriendsRequest.findByIdAndUpdate(
+
+    // Cập nhật trạng thái yêu cầu kết bạn
+    const updatedRequest = await FriendsRequest.findOneAndUpdate(
       { _id: requestId },
-      { requestStatus }
+      { requestStatus },
+      { new: true }
     );
+
+    // Kiểm tra xem người dùng có đang cố gắng thêm chính họ không
+    if (friendRequest.requestFrom === requesterId) {
+      return res.status(400).json({
+        success: false,
+        message: "Bạn không thể thêm chính mình vào danh sách bạn bè.",
+      });
+    }
+
+    // Xử lý yêu cầu chấp nhận bạn bè
     if (requestStatus === "Accepted") {
       const [user, friend] = await Promise.all([
-        Users.findById(requesterId),
-        Users.findById(friendRequest.requestFrom),
+        Users.findById(requesterId),           // Người nhận yêu cầu
+        Users.findById(friendRequest.requestFrom), // Người gửi yêu cầu
       ]);
-     if (!user.friends.includes(friendRequest.requestFrom)) {
-      user.friends.push(friendRequest.requestFrom); 
-    }
-    if (!friend.friends.includes(requesterId)) {
-      friend.friends.push(requesterId);
-    }
+
+      // Thêm bạn bè vào danh sách của người nhận yêu cầu
+      if (!friend.friends.includes(friendRequest.requestTo)) {
+        friend.friends.push(friendRequest.requestTo); 
+        console.log("friend",friend)
+      }
+      // Thêm người nhận yêu cầu vào danh sách bạn bè của người gửi yêu cầu
+      if (!user.friends.includes(friendRequest.requestFrom)) {
+        user.friends.push(friendRequest.requestFrom);
+        console.log("user",user)
+      }
+      
       await Promise.all([user.save(), friend.save()]); 
     } else {
+      // Nếu không chấp nhận, xóa yêu cầu
       await FriendsRequest.findByIdAndDelete(requestId);
     }
+
     res.status(200).json({
       success: true,
       message: `Friend Request ${requestStatus}`, 
@@ -104,6 +261,7 @@ export const respondToFriendRequest = async (req, res, next) => {
     });
   }
 };
+
 export const verifyEmail = async (req, res) => {
   const { userId, token } = req.params;
   try {
@@ -232,6 +390,7 @@ export const friendRequest = async (req, res, next) => {
 export const getFriendRequest = async (req, res, next) => {
   try {
     const { userId } = req.body.user;
+    console.log(userId)
     if (!userId) {
       return res.status(400).json({
         success: false,

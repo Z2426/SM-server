@@ -23,7 +23,7 @@ const userSchema = new mongoose.Schema({
         select: false
     },
     location: { type: String },
-    profileUrl: { type: String },
+    avatar: { type: String },
     profession: { type: String },
     friends: [{ type: Schema.Types.ObjectId, ref: 'Users' }],
     views: [{ type: Schema.Types.ObjectId, ref: 'Users' }], // Nếu views là bài viết hoặc các đối tượng khác
@@ -46,7 +46,9 @@ const userSchema = new mongoose.Schema({
     statusActive: {
         type: Boolean,
         default: true
-    }
+    },
+    blocked: [{ type: Schema.Types.ObjectId, ref: 'Users' }],
+    following: [{ type: Schema.Types.ObjectId, ref: 'Users' }],
 }, {
     timestamps: true
 });

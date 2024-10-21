@@ -5,13 +5,14 @@ const postSchema = new mongoose.Schema(
     description: { type: String, required: true },  
     image: { type: String },
     likes: [{ type: Schema.Types.ObjectId, ref: "Users" }],  
-    comments: [{ type: Schema.Types.ObjectId, ref: "Comments" }],
+    comments: [{ type: Schema.Types.ObjectId, ref: "Comment" }],
     visibility: {
       type: String,
       enum: ['public', 'friends', 'onlyme', 'specific', 'draft','private'],
       default: 'public'  
     },
     specifiedUsers: [{ type: Schema.Types.ObjectId, ref: "Users" }],
+    followers: [{ type: Schema.Types.ObjectId, ref: "Users" }],
     viewers: [{ type: Schema.Types.ObjectId, ref: "Users" }],
     views: { type: Number, default: 0 }},
   { timestamps: true }
