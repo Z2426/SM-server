@@ -1,6 +1,65 @@
 import Comments from "../models/commentModel.js";
 import Posts from "../models/postModel.js";
-import Users from "../models/userModel.js";
+import {checkIfFriends} from "./userController.js"
+//follow & unfollow post 
+// Follow/Unfollow API
+export const handleFollowPost = async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { userId } = req.body.user; // The user who wants to follow/unfollow
+    // Find the post by ID
+    const post = await Posts.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+    // Check if the user has access to follow the post based on visibility
+    const userCanAccessPost = checkUserAccessToPost(post, userId);
+
+    if (!userCanAccessPost) {
+      return res.status(403).json({ message: 'You do not have permission to follow this post' });
+    }
+    // Check if the user is already following the post
+    const isFollowing = post.followers.includes(userId);
+    if (isFollowing) {
+      // Unfollow: Remove the user from the followers array
+      post.followers = post.followers.filter(followerId => followerId &&followerId.toString() !== userId);
+      await post.save();
+      return res.status(200).json({ message: 'Unfollowed successfully', post });
+    } else {
+      // Follow: Add the user to the followers array
+      post.followers.push(userId);
+      await post.save();
+      return res.status(200).json({ message: 'Followed successfully', post });
+    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+}
+// check user can acess post
+// Function to check if a user can access the post based on visibility
+export const checkUserAccessToPost= async(post, userId)=> {
+  const postOwnerId = post.userId._id.toString();
+  switch (post.visibility) {
+    case 'public':
+      return true; // Public posts are accessible to everyone
+    case 'friends':
+      // Check if the user is friends with the post owner (add your own friends logic)
+      return checkIfFriends(postOwnerId, userId);
+    case 'onlyme':
+      return postOwnerId === userId; // Only the owner can access this post
+    case 'specific':
+      // Check if the user is in the list of specified users who can see the post
+      return postOwnerId === userId || post.specifiedUsers.some(specificUser => specificUser._id.toString() === userId);
+    case 'draft':
+      return false; // Draft posts are not visible to anyone except the owner
+    default:
+      return false; // Default to false if visibility is unknown
+  }
+}
+
+
+
 
 //handle comment
 // get all comment of post
@@ -27,7 +86,7 @@ export const commentPost= async(req,res)=>{
 }
 export const getRepliesByComment =async(req,res)=>{
   try {
-    const comment = await Comments.findById(req.params.commentId).populate("replies.userId", "-password");
+    const comment = await Comments.findById(req.params.commentId).populate("replies.userId");
     if (!comment) return res.status(404).json({ message: "Comment not found" });
     res.status(200).json(comment.replies);
   } catch (error) {
@@ -105,7 +164,7 @@ export const deleteReply = async(req,res)=>{
   }
 }
 // UPDATE
-//  like post, comment, reply
+//  like post
 export const toggleLike = async (req, res) => {
   const { entityId, type } = req.params;  // entityId là ID của post, comment hoặc reply
   const { userId } = req.body.user;

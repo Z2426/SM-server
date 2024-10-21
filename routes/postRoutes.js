@@ -1,8 +1,9 @@
 import express from "express"
 import* as postController from "../controller/postController.js"
 import { userAuth } from "../middleware/authMiddleware.js"
-
 const router = express.Router()
+//handle follow post
+router.post('/follow/:postId',userAuth,postController.handleFollowPost)
 //handle route reply
 router.put("/comments/:commentId/replies/:replyId",userAuth,postController.editReply)
 router.delete("/comments/:commentId/replies/:replyId",userAuth,postController.deleteReply)

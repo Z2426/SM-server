@@ -7,6 +7,18 @@ import passwordReset from "../models/passwordResetModel.js";
 import { resetPasswordLink } from "../untils/sendEmail.js";
 import Posts from "../models/postModel.js";
 //import { followNotification } from "./notifiController.js";
+//check friend
+export const  checkIfFriends = async(userId1, userId2) =>{
+  try {
+    // Find the user with userId1 and check if userId2 is in their friends list
+    const user = await Users.findOne({ _id: userId1, friends: userId2 });
+    // If the user is found, userId2 is a friend, so return true
+    return !!user;
+  } catch (error) {
+    console.error('Error checking if users are friends:', error);
+    return false; // If there was an error or no result, return false
+  }
+}
 // unfriend
 export const unfriendUser = async (req, res, next) => {
   try {

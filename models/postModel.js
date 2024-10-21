@@ -8,7 +8,7 @@ const postSchema = new mongoose.Schema(
     comments: [{ type: Schema.Types.ObjectId, ref: "Comment" }],
     visibility: {
       type: String,
-      enum: ['public', 'friends', 'onlyme', 'specific', 'draft','private'],
+      enum: ['public', 'friends', 'onlyme', 'specific', 'draft'],
       default: 'public'  
     },
     specifiedUsers: [{ type: Schema.Types.ObjectId, ref: "Users" }],
